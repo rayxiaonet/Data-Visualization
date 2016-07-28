@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+path {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.sphere,
+.graticule {
+  stroke: #aaa;
+}
+
+.equator {
+  stroke: red;
+  stroke-width: 2px;
+}
+
+
+
+body {
+  background: #fcfcfa;
+}
+
+.stroke {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3px;
+}
+
+.fill {
+  fill: #fff;
+}
+
+.graticule {
+  fill: none;
+  stroke: #777;
+  stroke-width: .5px;
+  stroke-opacity: .5;
+}
+
+.land {
+  fill: black;
+}
+
+.boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: .5px;
+}
+.arc {
+  fill: white;
+  fill-opacity: 1;
+  stroke: black;
+  stroke-opacity: 0.5;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
+<script src="GISTData.js"></script>
+
+<script>
+var indexedData = {}
+data.map(function(d){
+  indexedData[d["Year"]]=d;
+})
+
+
+
+
+var width = 960,
+    height = 500,
+    rotate = [10, -10],
+    velocity = [.003, -.001],
+    time = Date.now();
+
+var projection = d3.geo.orthographic()
+    .scale(240)
+    .translate([width / 2, height / 2])
+    .clipAngle(90 + 1e-6)
+    .precision(.3);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var graticule = d3.geo.graticule();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+svg.append("path")
+    .datum({type: "Sphere"})
+    .attr("class", "sphere")
+    .attr("d", path);
+// svg.append("path")
+//     .datum(graticule)
+//     .attr("class", "graticule")
+//     .attr("d", path);
+
+
+
+
+
+
+
+svg.append("path")
+    .datum({type: "LineString", coordinates: [[-180, 0], [-90, 0], [0, 0], [90, 0], [180, 0]]})
+    .attr("class", "equator")
+    .attr("d", path);
+
+
+
+    d3.json("world-50m.json", function(error, world) {
+      if (error) throw error;
+//,":first-child"
+      svg.append("path")
+          .datum(topojson.feature(world, world.objects.land))
+          .attr("class", "land")
+          .attr("d", path);
+
+      // svg.insert("path", ".graticule")
+      //     .datum(topojson.mesh(world, world.objects.countries, function(a, b) { return a !== b; }))
+      //     .attr("class", "boundary")
+      //     .attr("d", path);
+    });
+
+var latitudeRange = {
+  "64N-90N":{W: 0, N: 90.0, E: 360.0, S: 64.0 },
+  "44N-64N":{W: 0, N: 64.0, E: 360.0, S: 44.0 },
+  "24N-44N":{W: 0, N: 44.0, E: 360.0, S: 24.0 },
+  "EQU-24N":{W: 0, N: 24.0, E: 360.0, S: 0.0 },
+  "24S-EQU":{W: 0, N: 0.0, E: 360.0, S: -24.0 },
+  "44S-24S":{W: 0, N: -24.0, E: 360.0, S: -44.0 },
+  "64S-44S":{W: 0, N: -44.0, E: 360.0, S: -64.0 },
+  "90S-64S":{W: 0, N: -64.0, E: 360.0, S: -89.9 }
+
+}
+
+var arcs = []
+
+Object.keys(latitudeRange).forEach(function(k) {
+      var r=latitudeRange[k]
+      var arc = d3.geo.graticule()
+      .majorExtent([[r.W, r.S], [r.E, r.N]]);
+
+      svg.append("path")
+          .attr("class", "arc_"+k)
+          .attr("d", path(arc.outline()))
+          .style("fill","white")
+          .style("stroke","black");
+          //          .style("opacity","0.3")
+     r.arc=arc;
+});
+
+
+var ready =true;
+
+var year=2010
+
+
+d3.timer(function() {
+  if (ready) {
+  var dt = Date.now() - time;
+  projection.rotate([rotate[0] + velocity[0] * dt, 0]);
+  var feature = svg.selectAll("path.land");
+  feature.attr("d", path);
+  Object.keys(latitudeRange).forEach(function(k) {
+   svg.select(".arc_"+k).attr("d", path(latitudeRange[k].arc.outline()));
+  });
+
+
+  }
+});
+
+
+function rotate() {
+  projection.rotate([30, 0]);
+}
+function deeper() {
+}
+function applyYear(year) {
+  $("#currentYear").text(year)
+  var data = indexedData[year];
+  Object.keys(latitudeRange).forEach(function(k) {
+    var color="white";
+    if (data[k]>0) {
+      color = "red"
+      opacity=data[k]*0.0025
+    }else {
+      color = "blue"
+      opacity=data[k] * -0.0025
+    }
+    $("#l_"+k).text(data[k] + " : "+opacity)
+    //opacity mapping:
+    //200->0.5
+    //120->0.3
+    svg.select("path.arc_"+k).style("fill",color).style("opacity",opacity)
+
+  });
+
+
+
+}
+$(document).ready(function() {
+
+  applyYear(year)
+});
+
+
+</script>
+Actual Weather diff
+<p>64N-90N : <span id="l_64N-90N"></span></p>
+<p>44N-64N : <span id="l_44N-64N"></span></p>
+<p>24N-44N : <span id="l_24N-44N"></span></p>
+<p>EQU-24N : <span id="l_EQU-24N"></span></p>
+<p>24S-EQU : <span id="l_24S-EQU"></span></p>
+<p>44S-24S : <span id="l_44S-24S"></span></p>
+<p>64S-44S : <span id="l_64S-44S"></span></p>
+<p>90S-64S : <span id="l_90S-64S"></span></p>
+<input type=button value="rotate" onclick="rotate()"/>
+<input type=button value="deeper" onclick="deeper()"/>
+<input type=button value="Prev year" onclick="applyYear(--year)"/>
+
+Current year is <span id="currentYear"></span>
+<input type=button value="Next year" onclick="applyYear(++year)"/>
